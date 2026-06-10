@@ -218,86 +218,70 @@
       import { store, CmdTrimClip, CmdAddClip, getClip } from './js/core/state.js';
       import { playback, formatTimecode } from './js/core/playback.js';
       import { bus } from './js/core/bus.js';
+      import { TimelinePanel } from './js/panels/timeline/index.js';
 
       // Simple timeline renderer
       const timelineTracks = document.getElementById('timeline-tracks');
-      let selectedClipId = null;
 
-      function renderTimeline() {
-        timelineTracks.innerHTML = '';
-        const { tracks, clips, project } = store.state;
 
-        // Let's assume 10 seconds = 100% width for now, or just some scale
-        const scale = 20; // 20px per second
 
-        for (const track of tracks) {
-          const trackEl = document.createElement('div');
-          trackEl.className = 'track';
-
-          trackEl.innerHTML = `
-            <div class="track-label">${track.name}</div>
-            <div class="track-content" style="min-width: ${project.duration * scale}px"></div>
-          `;
-
-          const contentEl = trackEl.querySelector('.track-content');
-
-          // Drop zone for clips
-          contentEl.addEventListener('dragover', e => e.preventDefault());
-          contentEl.addEventListener('drop', e => {
-             e.preventDefault();
-             try {
-               const data = JSON.parse(e.dataTransfer.getData('application/json'));
-               if (data.type === 'asset') {
-                 // Calculate drop time based on mouse x
-                 const rect = contentEl.getBoundingClientRect();
-                 const x = e.clientX - rect.left + contentEl.parentElement.scrollLeft;
-                 const dropTime = x / scale;
-                 store.dispatch(CmdAddClip(track.id, data.id, dropTime, 0, data.duration || 5, data.kind));
-               }
-             } catch(err){}
-          });
-
-          for (const clipId of track.clips) {
-            const clip = clips[clipId];
-            if (!clip) continue;
-
-            const clipEl = document.createElement('div');
-            clipEl.className = 'clip' + (selectedClipId === clipId ? ' selected' : '');
-            clipEl.style.left = `${clip.start * scale}px`;
-            clipEl.style.width = `${clip.duration * scale}px`;
-            // Quick name (from asset if possible)
-            const asset = store.state.assets[clip.assetId];
-            clipEl.textContent = asset ? asset.name : 'Clip';
-
-            clipEl.addEventListener('click', (e) => {
-              e.stopPropagation();
-              selectedClipId = clipId;
-              if (inspectorPanel) inspectorPanel.setSelectedClipId(selectedClipId);
-              renderTimeline(); // update selection outline
-            });
-
-            contentEl.appendChild(clipEl);
-          }
-
-          timelineTracks.appendChild(trackEl);
-        }
-      }
-
-      // Deselect when clicking outside
-      document.addEventListener('click', (e) => {
-         if (!e.target.closest('.clip') && !e.target.closest('#inspector-root')) {
-             if (selectedClipId) {
-                selectedClipId = null;
-                if (inspectorPanel) inspectorPanel.setSelectedClipId(null);
-                renderTimeline();
-             }
-         }
-      });
-
-      bus.on('state:changed', renderTimeline);
 
       // The new Inspector panel instance will be created in app.init
       let inspectorPanel;
+
+
+
+      // Simple inspector
+
+      let selectedClipId = null;
+const inspContent = document.getElementById('inspector-content');
+      const inspPlaceholder = document.querySelector('.placeholder-text');
+      const inspStub = document.getElementById('inspector-stub');
+      const inpStart = document.getElementById('insp-start');
+      const inpOffset = document.getElementById('insp-offset');
+      const inpDuration = document.getElementById('insp-duration');
+
+      function renderInspector() {
+        if (!selectedClipId) {
+          inspPlaceholder.style.display = 'block';
+          inspStub.style.display = 'none';
+          return;
+        }
+
+        const clip = getClip(selectedClipId);
+        if (!clip) {
+          selectedClipId = null;
+          renderInspector();
+          return;
+        }
+
+        inspPlaceholder.style.display = 'none';
+        inspStub.style.display = 'block';
+
+        inpStart.value = clip.start.toFixed(2);
+        inpOffset.value = clip.offset.toFixed(2);
+        inpDuration.value = clip.duration.toFixed(2);
+      }
+
+      function updateClipFromInspector() {
+        if (!selectedClipId) return;
+        const newStart = parseFloat(inpStart.value);
+        const newOffset = parseFloat(inpOffset.value);
+        const newDuration = parseFloat(inpDuration.value);
+
+        if (isNaN(newStart) || isNaN(newOffset) || isNaN(newDuration)) return;
+
+        store.dispatch(CmdTrimClip(selectedClipId, newStart, newOffset, newDuration));
+      }
+
+      inpStart.addEventListener('change', updateClipFromInspector);
+      inpOffset.addEventListener('change', updateClipFromInspector);
+      inpDuration.addEventListener('change', updateClipFromInspector);
+
+      bus.on('state:changed', renderInspector);
+
+      // Initial render calls will be triggered by app init
+
 
       // App Initialization and Wiring
       import { LibraryPanel } from './js/panels/library.js';
@@ -307,18 +291,26 @@
       import { mediaManager } from './js/core/media.js';
       import { exportDialog } from './js/export/export-dialog.js';
 
-      const app = {
+      window.app = {
+
         init() {
           this.library = new LibraryPanel();
           inspectorPanel = new InspectorPanel();
+          this.inspector = inspectorPanel;
           this.titles = new TitlesPanel();
+
+          this.timeline = new TimelinePanel();
+
           this.bindTopbar();
           this.bindTransport();
           this.bindShortcuts();
 
           // Initial renders
-          renderTimeline();
+
           inspectorPanel.setSelectedClipId(selectedClipId);
+
+          renderInspector();
+
 
           // Restore UI state from store if needed
           document.getElementById('project-name').value = store.state.project.name;

@@ -149,3 +149,12 @@ compositor.renderRange(t0, t1, fps, onFrameCallback)
   - **MP4**: Dynamically loads `ffmpeg.wasm`, writes raw JPEGs and a mixed WAV buffer into its virtual filesystem, then executes the `libx264` codec.
   - **PNG**: Single frame capture using `canvas.toDataURL()`.
   - **WAV**: Mixes all audio tracks down using `OfflineAudioContext`.
+
+- The export module will iterate from `t0` to `t1` based on `project.fps`, capturing frames via `compositor.canvas` and feeding them to WebCodecs or MediaRecorder.
+
+### Timeline UI Module Contracts
+- **Timeline UI**: Implemented in \`js/panels/timeline/index.js\`.
+  - Dispatches \`CmdMoveClip\`, \`CmdTrimClip\`, \`CmdAddClip\`, \`CmdRemoveClip\`, \`CmdSplitClip\`, \`CmdDuplicateClip\` to support drag-and-drop, moving, edge-trimming, context menus, and split operations.
+  - Subscribes to \`playback:timeupdate\` to visually translate the playhead across the timeline ruler.
+  - Subscribes to \`state:changed\` for reacting to all state updates to re-render clips and track lane positions based on zoom factors (\`pixelsPerSecond\`).
+  - Stores UI state entirely local to the module class, adhering to pure architectural boundaries (no side effects crossing into compositor logic).
