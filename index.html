@@ -296,6 +296,7 @@ const inspContent = document.getElementById('inspector-content');
         init() {
           this.library = new LibraryPanel();
           inspectorPanel = new InspectorPanel();
+          this.inspector = inspectorPanel;
           this.titles = new TitlesPanel();
 
           this.timeline = new TimelinePanel();
