@@ -37,17 +37,47 @@
 
     <!-- Main Workspace -->
     <main class="workspace">
-      <!-- Media Library (Left) -->
-      <aside class="panel library-panel" id="library-root">
-        <div class="panel-header">
-          <h3>Media Library</h3>
-          <label class="btn-import">
-            Import Media
-            <input type="file" id="import-file" multiple accept="video/*,audio/*,image/*" style="display:none;">
-          </label>
+      <!-- Left Panel Container -->
+      <aside class="panel left-panel-container">
+        <!-- Tab Navigation -->
+        <div class="panel-tabs" id="left-panel-tabs">
+          <button class="tab-btn active" data-target="library-root">Media</button>
+          <button class="tab-btn" data-target="titles-root">Titles</button>
+          <button class="tab-btn" data-target="shapes-root">Shapes</button>
         </div>
-        <div class="library-grid" id="library-grid">
-          <!-- Assets will render here -->
+
+        <!-- Media Library (Left) -->
+        <div class="tab-content active" id="library-root">
+          <div class="panel-header">
+            <h3>Media Library</h3>
+            <label class="btn-import">
+              Import Media
+              <input type="file" id="import-file" multiple accept="video/*,audio/*,image/*" style="display:none;">
+            </label>
+          </div>
+          <div class="library-grid" id="library-grid">
+            <!-- Assets will be injected here -->
+          </div>
+        </div>
+
+        <!-- Titles (Left) -->
+        <div class="tab-content" id="titles-root">
+          <div class="panel-header">
+            <h3>Titles & Text</h3>
+          </div>
+          <div class="presets-grid" id="titles-grid">
+            <!-- Title presets will be injected here -->
+          </div>
+        </div>
+
+        <!-- Shapes & Graphics (Left) -->
+        <div class="tab-content" id="shapes-root">
+          <div class="panel-header">
+            <h3>Shapes & Stickers</h3>
+          </div>
+          <div class="presets-grid" id="shapes-grid">
+            <!-- Shapes will be injected here -->
+          </div>
         </div>
       </aside>
 
@@ -230,12 +260,14 @@
 
       // App Initialization and Wiring
       import { LibraryPanel } from './js/panels/library.js';
+      import { TitlesPanel } from './js/panels/titles/index.js';
       import { compositor } from './js/core/compositor.js';
       import { mediaManager } from './js/core/media.js';
 
       const app = {
         init() {
           this.library = new LibraryPanel();
+          this.titles = new TitlesPanel();
           this.bindTopbar();
           this.bindTransport();
           this.bindShortcuts();
