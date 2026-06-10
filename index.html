@@ -166,7 +166,7 @@
             clipEl.addEventListener('click', (e) => {
               e.stopPropagation();
               selectedClipId = clipId;
-              renderInspector();
+              if (inspectorPanel) inspectorPanel.setSelectedClipId(selectedClipId);
               renderTimeline(); // update selection outline
             });
 
@@ -177,72 +177,39 @@
         }
       }
 
+      // Deselect when clicking outside
+      document.addEventListener('click', (e) => {
+         if (!e.target.closest('.clip') && !e.target.closest('#inspector-root')) {
+             if (selectedClipId) {
+                selectedClipId = null;
+                if (inspectorPanel) inspectorPanel.setSelectedClipId(null);
+                renderTimeline();
+             }
+         }
+      });
+
       bus.on('state:changed', renderTimeline);
 
-      // Simple inspector
-      const inspContent = document.getElementById('inspector-content');
-      const inspPlaceholder = document.querySelector('.placeholder-text');
-      const inspStub = document.getElementById('inspector-stub');
-      const inpStart = document.getElementById('insp-start');
-      const inpOffset = document.getElementById('insp-offset');
-      const inpDuration = document.getElementById('insp-duration');
-
-      function renderInspector() {
-        if (!selectedClipId) {
-          inspPlaceholder.style.display = 'block';
-          inspStub.style.display = 'none';
-          return;
-        }
-
-        const clip = getClip(selectedClipId);
-        if (!clip) {
-          selectedClipId = null;
-          renderInspector();
-          return;
-        }
-
-        inspPlaceholder.style.display = 'none';
-        inspStub.style.display = 'block';
-
-        inpStart.value = clip.start.toFixed(2);
-        inpOffset.value = clip.offset.toFixed(2);
-        inpDuration.value = clip.duration.toFixed(2);
-      }
-
-      function updateClipFromInspector() {
-        if (!selectedClipId) return;
-        const newStart = parseFloat(inpStart.value);
-        const newOffset = parseFloat(inpOffset.value);
-        const newDuration = parseFloat(inpDuration.value);
-
-        if (isNaN(newStart) || isNaN(newOffset) || isNaN(newDuration)) return;
-
-        store.dispatch(CmdTrimClip(selectedClipId, newStart, newOffset, newDuration));
-      }
-
-      inpStart.addEventListener('change', updateClipFromInspector);
-      inpOffset.addEventListener('change', updateClipFromInspector);
-      inpDuration.addEventListener('change', updateClipFromInspector);
-
-      bus.on('state:changed', renderInspector);
-
-      // Initial render calls will be triggered by app init
+      // The new Inspector panel instance will be created in app.init
+      let inspectorPanel;
 
       // App Initialization and Wiring
       import { LibraryPanel } from './js/panels/library.js';
+      import { InspectorPanel } from './js/panels/inspector/inspector.js';
       import { compositor } from './js/core/compositor.js';
       import { mediaManager } from './js/core/media.js';
 
       const app = {
         init() {
           this.library = new LibraryPanel();
+          inspectorPanel = new InspectorPanel();
           this.bindTopbar();
           this.bindTransport();
           this.bindShortcuts();
 
           // Initial renders
           renderTimeline();
-          renderInspector();
+          inspectorPanel.setSelectedClipId(selectedClipId);
 
           // Restore UI state from store if needed
           document.getElementById('project-name').value = store.state.project.name;
