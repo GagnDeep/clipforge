@@ -133,9 +133,10 @@ All cross-module communication happens through the bus.
 - **DOM**: Mounts into `#timeline-root`.
 
 ### Inspector Contract
-- **Reads**: Currently selected clip from a selection state (managed in state or a separate UI state).
-- **Listens**: `state:changed`.
-- **Dispatches**: Commands (`CmdUpdateClipTransform`, `CmdTrimClip`, etc.).
+- **Reads**: Currently selected clip from `index.html`'s selection state via `setSelectedClipId(clipId)`.
+- **Listens**: `state:changed`, `playback:timeupdate` (for keyframe interpolation).
+- **Dispatches**: Commands (`CmdUpdateClipTransform`, `CmdUpdateClipEffects`, `CmdUpdateClipSpeed`, `CmdUpdateClipAudio`, `CmdUpdateClipText`, `CmdUpdateProjectSettings`, `CmdAddKeyframe`, `CmdRemoveKeyframe`).
+- **DOM**: Mounts into `#inspector-content`. Replaces old inline stub.
 
 ### Export Contract
 The compositor exposes:

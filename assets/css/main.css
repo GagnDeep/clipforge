@@ -510,3 +510,52 @@ button:disabled {
   display: inline-block;
   width: 140px;
 }
+
+/* Inspector Panel Additions */
+.inspector-section {
+  padding: 10px;
+  border-bottom: 1px solid var(--border-light);
+}
+.inspector-section h4 {
+  font-size: 12px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+  letter-spacing: 0.5px;
+}
+.prop-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+.prop-row label {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-main);
+}
+.prop-row input[type="text"],
+.prop-row input[type="number"],
+.prop-row select {
+  flex: 1.5;
+  background: var(--bg-deep);
+  border: 1px solid var(--border-light);
+  color: var(--text-main);
+  padding: 4px;
+  border-radius: 2px;
+  font-family: var(--font-ui);
+  font-variant-numeric: tabular-nums;
+  width: 100%;
+}
+.prop-row input[type="color"] {
+  flex: 1.5;
+  background: transparent;
+  border: none;
+  height: 24px;
+  padding: 0;
+  cursor: pointer;
+}
+.prop-row input[type="range"] {
+  flex: 1.5;
+  accent-color: var(--accent-amber);
+}
