@@ -86,6 +86,11 @@ The core project state (`state.project`) follows this structure:
         strokeWidth: 2,
         content: '<svg>...</svg>', // for svg type
         shadow: { color: 'rgba(0,0,0,0.5)', blur: 10, offsetX: 4, offsetY: 4 }
+      },
+      // Additive extensions
+      transition: { // Optional transition describing how this clip enters from the previous adjacent clip
+        type: 'crossfade' | 'dipToBlack',
+        duration: 0.5
       }
     }
   },
@@ -112,6 +117,7 @@ Every mutation to the state uses the Command pattern. Commands are functions tha
 - `CmdRemoveClip(clipId)`
 - `CmdUpdateProjectName(newName)`
 - `CmdUpdateClipTransform(clipId, transform)`
+- `CmdUpdateClipTransition(clipId, transition)`
 
 ## Bus Events
 All cross-module communication happens through the bus.

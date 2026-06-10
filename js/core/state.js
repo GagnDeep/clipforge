@@ -322,6 +322,9 @@ export function CmdSplitClip(clipId, splitTime) {
       rightClip.offset = rightOffset;
       rightClip.duration = rightDuration;
 
+      // Right clip shouldn't keep the incoming transition of the left clip, as it's an immediate cut
+      delete rightClip.transition;
+
       state.clips[newClipId] = rightClip;
 
       const track = state.tracks.find(t => t.id === clip.trackId);
@@ -382,6 +385,35 @@ export function CmdDuplicateClip(clipId) {
       const track = state.tracks.find(t => t.id === originalClipData.trackId);
       if (track) {
         track.clips = track.clips.filter(id => id !== newClipId);
+      }
+    }
+  };
+}
+
+export function CmdUpdateClipTransition(clipId, transition) {
+  let oldTransition = null;
+  return {
+    execute: (state) => {
+      const clip = state.clips[clipId];
+      if (!clip) return;
+      if (clip.transition) {
+        oldTransition = JSON.parse(JSON.stringify(clip.transition));
+      } else {
+        oldTransition = null;
+      }
+      if (transition) {
+        clip.transition = JSON.parse(JSON.stringify(transition));
+      } else {
+        delete clip.transition;
+      }
+    },
+    undo: (state) => {
+      const clip = state.clips[clipId];
+      if (!clip) return;
+      if (oldTransition) {
+        clip.transition = JSON.parse(JSON.stringify(oldTransition));
+      } else {
+        delete clip.transition;
       }
     }
   };

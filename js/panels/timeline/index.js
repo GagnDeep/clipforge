@@ -1,5 +1,5 @@
 import { bus } from '../../core/bus.js';
-import { store, CmdAddClip, CmdMoveClip, CmdTrimClip, CmdRemoveClip, CmdSplitClip, CmdDuplicateClip, CmdRippleDeleteClip, CmdPasteClips, CmdUpdateTrackState } from '../../core/state.js';
+import { store, CmdAddClip, CmdMoveClip, CmdTrimClip, CmdRemoveClip, CmdSplitClip, CmdDuplicateClip, CmdRippleDeleteClip, CmdPasteClips, CmdUpdateTrackState, CmdUpdateClipTransition } from '../../core/state.js';
 import { playback } from '../../core/playback.js';
 
 export class TimelinePanel {
@@ -29,6 +29,46 @@ export class TimelinePanel {
 
     this.initDOM();
     this.bindEvents();
+    this.createTransitionPicker();
+  }
+
+  createTransitionPicker() {
+      this.transitionPicker = document.createElement('div');
+      this.transitionPicker.className = 'transition-picker';
+      this.transitionPicker.innerHTML = `
+         <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label>Transition</label>
+            <button id="tp-close" style="background:none; border:none; color:var(--text-muted); cursor:pointer;">&times;</button>
+         </div>
+         <select id="tp-type">
+            <option value="none">None</option>
+            <option value="crossfade">Crossfade</option>
+            <option value="dipToBlack">Dip to Black</option>
+         </select>
+         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <label>Duration (s)</label>
+            <input type="number" id="tp-dur" value="0.5" step="0.1" min="0.1" style="width:60px;">
+         </div>
+         <button id="tp-apply" class="accent-btn" style="padding:4px; font-size:11px;">Apply</button>
+      `;
+      document.body.appendChild(this.transitionPicker);
+
+      this.transitionPicker.querySelector('#tp-close').addEventListener('click', () => {
+          this.transitionPicker.style.display = 'none';
+      });
+
+      this.transitionPicker.querySelector('#tp-apply').addEventListener('click', () => {
+          if (!this.activeJunctionClipId) return;
+          const type = this.transitionPicker.querySelector('#tp-type').value;
+          const duration = parseFloat(this.transitionPicker.querySelector('#tp-dur').value) || 0.5;
+
+          if (type === 'none') {
+             store.dispatch(CmdUpdateClipTransition(this.activeJunctionClipId, null));
+          } else {
+             store.dispatch(CmdUpdateClipTransition(this.activeJunctionClipId, { type, duration }));
+          }
+          this.transitionPicker.style.display = 'none';
+      });
   }
 
 
@@ -203,6 +243,28 @@ export class TimelinePanel {
 
     this.lanesContent.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return; // Only left click
+
+      const junctionEl = e.target.closest('.transition-junction');
+      if (junctionEl) {
+         e.stopPropagation();
+         this.activeJunctionClipId = junctionEl.dataset.clipId;
+         const clip = store.state.clips[this.activeJunctionClipId];
+         this.activeJunctionOldTrans = clip && clip.transition ? JSON.parse(JSON.stringify(clip.transition)) : null;
+
+         const rect = junctionEl.getBoundingClientRect();
+         this.transitionPicker.style.display = 'flex';
+         this.transitionPicker.style.left = `${rect.left}px`;
+         this.transitionPicker.style.top = `${rect.bottom + 5}px`;
+
+         if (clip && clip.transition) {
+             this.transitionPicker.querySelector('#tp-type').value = clip.transition.type;
+             this.transitionPicker.querySelector('#tp-dur').value = clip.transition.duration;
+         } else {
+             this.transitionPicker.querySelector('#tp-type').value = 'none';
+             this.transitionPicker.querySelector('#tp-dur').value = 0.5;
+         }
+         return;
+      }
 
       const handleEl = e.target.closest('.clip-handle');
       const clipEl = e.target.closest('.clip-block');
@@ -713,6 +775,34 @@ export class TimelinePanel {
 
       lane.appendChild(clipEl);
     });
+
+    // Add transition affordances
+    const trackClips = track.clips.map(id => clips[id]).filter(c => c).sort((a, b) => a.start - b.start);
+    for (let i = 1; i < trackClips.length; i++) {
+        const prev = trackClips[i-1];
+        const current = trackClips[i];
+        if (Math.abs((prev.start + prev.duration) - current.start) < 0.1) {
+            const junctionEl = document.createElement('div');
+            junctionEl.className = 'transition-junction';
+            junctionEl.dataset.clipId = current.id;
+
+            const junctionTime = current.start;
+            const junctionX = junctionTime * this.zoomLevel;
+
+            junctionEl.style.left = `${junctionX}px`;
+            junctionEl.title = 'Add Transition';
+
+            if (current.transition) {
+                junctionEl.classList.add('active');
+                if (current.transition.type === 'crossfade') junctionEl.innerHTML = '⧓'; // crossfade icon approximation
+                if (current.transition.type === 'dipToBlack') junctionEl.innerHTML = '◧'; // dip to black icon
+            } else {
+                junctionEl.innerHTML = '＋';
+            }
+
+            lane.appendChild(junctionEl);
+        }
+    }
   }
 
   updatePlayhead() {
