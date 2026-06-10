@@ -38,8 +38,8 @@ The core project state (`state.project`) follows this structure:
   clips: {
     'clip_id': {
       id: 'string',
-      assetId: 'string' | null, // null for text clips
-      kind: 'video' | 'audio' | 'image' | 'text',
+      assetId: 'string' | null, // null for text/graphic clips
+      kind: 'video' | 'audio' | 'image' | 'text' | 'graphic',
       trackId: 'string',
       start: 0, // Time in project (seconds)
       offset: 0, // Offset into the media (seconds)
@@ -54,12 +54,38 @@ The core project state (`state.project`) follows this structure:
       effects: [
         // CSS filter strings like 'brightness(1.2)'
       ],
+      animations: { // Optional, for text/graphic clips
+        in: 'fade' | 'slide' | 'pop' | 'typewriter',
+        inDuration: 0.5,
+        out: 'fade' | 'slide' | 'pop',
+        outDuration: 0.5
+      },
       text: { // Only for text clips
         content: 'string',
         font: 'string',
         size: 48,
         color: '#ffffff',
-        align: 'center'
+        align: 'center',
+        // Additive extensions
+        background: 'rgba(...)', // Background pill color
+        bgRadius: 8,
+        paddingX: 20,
+        paddingY: 10,
+        stroke: '#000000',
+        strokeWidth: 2,
+        shadow: { color: 'rgba(0,0,0,0.5)', blur: 10, offsetX: 4, offsetY: 4 },
+        maxWidth: 600
+      },
+      graphic: { // Only for graphic clips
+        type: 'rect' | 'roundrect' | 'circle' | 'svg',
+        width: 100,
+        height: 100,
+        radius: 0,
+        fill: '#ffffff',
+        stroke: '#000000',
+        strokeWidth: 2,
+        content: '<svg>...</svg>', // for svg type
+        shadow: { color: 'rgba(0,0,0,0.5)', blur: 10, offsetX: 4, offsetY: 4 }
       }
     }
   },
