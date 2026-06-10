@@ -234,3 +234,277 @@ export function getAsset(assetId) {
 export function getClip(clipId) {
   return store.state.clips[clipId];
 }
+
+export function CmdMoveClip(clipId, newTrackId, newStart) {
+  let oldTrackId, oldStart;
+  return {
+    execute: (state) => {
+      const clip = state.clips[clipId];
+      if (!clip) return;
+      oldTrackId = clip.trackId;
+      oldStart = clip.start;
+
+      clip.start = newStart;
+      clip.trackId = newTrackId;
+
+      if (oldTrackId !== newTrackId) {
+        const oldTrack = state.tracks.find(t => t.id === oldTrackId);
+        const newTrack = state.tracks.find(t => t.id === newTrackId);
+        if (oldTrack) oldTrack.clips = oldTrack.clips.filter(id => id !== clipId);
+        if (newTrack && !newTrack.clips.includes(clipId)) newTrack.clips.push(clipId);
+      }
+    },
+    undo: (state) => {
+      const clip = state.clips[clipId];
+      if (!clip) return;
+      clip.start = oldStart;
+      clip.trackId = oldTrackId;
+
+      if (oldTrackId !== newTrackId) {
+        const oldTrack = state.tracks.find(t => t.id === oldTrackId);
+        const newTrack = state.tracks.find(t => t.id === newTrackId);
+        if (newTrack) newTrack.clips = newTrack.clips.filter(id => id !== clipId);
+        if (oldTrack && !oldTrack.clips.includes(clipId)) oldTrack.clips.push(clipId);
+      }
+    }
+  };
+}
+
+export function CmdRemoveClip(clipId) {
+  let oldClip = null;
+  let oldTrackId = null;
+  return {
+    execute: (state) => {
+      const clip = state.clips[clipId];
+      if (!clip) return;
+      oldClip = JSON.parse(JSON.stringify(clip));
+      oldTrackId = clip.trackId;
+
+      delete state.clips[clipId];
+      const track = state.tracks.find(t => t.id === oldTrackId);
+      if (track) {
+        track.clips = track.clips.filter(id => id !== clipId);
+      }
+    },
+    undo: (state) => {
+      if (!oldClip) return;
+      state.clips[clipId] = JSON.parse(JSON.stringify(oldClip));
+      const track = state.tracks.find(t => t.id === oldTrackId);
+      if (track && !track.clips.includes(clipId)) {
+        track.clips.push(clipId);
+      }
+    }
+  };
+}
+
+export function CmdSplitClip(clipId, splitTime) {
+  const newClipId = 'clip_' + generateId();
+  let oldDuration;
+  let addedClipInfo = null;
+
+  return {
+    execute: (state) => {
+      const clip = state.clips[clipId];
+      if (!clip || splitTime <= clip.start || splitTime >= clip.start + clip.duration) return;
+
+      oldDuration = clip.duration;
+      const leftDuration = splitTime - clip.start;
+      const rightDuration = oldDuration - leftDuration;
+      const rightOffset = clip.offset + leftDuration;
+
+      // Update left clip
+      clip.duration = leftDuration;
+
+      // Create right clip
+      const rightClip = JSON.parse(JSON.stringify(clip));
+      rightClip.id = newClipId;
+      rightClip.start = splitTime;
+      rightClip.offset = rightOffset;
+      rightClip.duration = rightDuration;
+
+      state.clips[newClipId] = rightClip;
+
+      const track = state.tracks.find(t => t.id === clip.trackId);
+      if (track) {
+        const idx = track.clips.indexOf(clipId);
+        if (idx !== -1) {
+          track.clips.splice(idx + 1, 0, newClipId);
+        } else {
+          track.clips.push(newClipId);
+        }
+      }
+
+      addedClipInfo = { id: newClipId, trackId: clip.trackId };
+    },
+    undo: (state) => {
+      if (!addedClipInfo) return;
+
+      const clip = state.clips[clipId];
+      if (clip) {
+        clip.duration = oldDuration;
+      }
+
+      delete state.clips[addedClipInfo.id];
+      const track = state.tracks.find(t => t.id === addedClipInfo.trackId);
+      if (track) {
+        track.clips = track.clips.filter(id => id !== addedClipInfo.id);
+      }
+    }
+  };
+}
+
+export function CmdDuplicateClip(clipId) {
+  const newClipId = 'clip_' + generateId();
+  let originalClipData = null;
+
+  return {
+    execute: (state) => {
+      const clip = state.clips[clipId];
+      if (!clip) return;
+
+      originalClipData = JSON.parse(JSON.stringify(clip));
+
+      const newClip = JSON.parse(JSON.stringify(clip));
+      newClip.id = newClipId;
+      // Place immediately after
+      newClip.start = clip.start + clip.duration;
+
+      state.clips[newClipId] = newClip;
+
+      const track = state.tracks.find(t => t.id === clip.trackId);
+      if (track) {
+        track.clips.push(newClipId);
+      }
+    },
+    undo: (state) => {
+      if (!originalClipData) return;
+      delete state.clips[newClipId];
+      const track = state.tracks.find(t => t.id === originalClipData.trackId);
+      if (track) {
+        track.clips = track.clips.filter(id => id !== newClipId);
+      }
+    }
+  };
+}
+
+export function CmdUpdateTrackState(trackId, updates) {
+  let oldValues = {};
+  return {
+    execute: (state) => {
+      const track = state.tracks.find(t => t.id === trackId);
+      if (!track) return;
+      for (const key in updates) {
+        oldValues[key] = track[key];
+        track[key] = updates[key];
+      }
+    },
+    undo: (state) => {
+      const track = state.tracks.find(t => t.id === trackId);
+      if (!track) return;
+      for (const key in oldValues) {
+        track[key] = oldValues[key];
+      }
+    }
+  };
+}
+
+export function CmdRippleDeleteClip(clipId) {
+  let oldClip = null;
+  let oldTrackId = null;
+  let shiftedClips = []; // Array of { id, oldStart }
+
+  return {
+    execute: (state) => {
+      const clip = state.clips[clipId];
+      if (!clip) return;
+
+      oldClip = JSON.parse(JSON.stringify(clip));
+      oldTrackId = clip.trackId;
+      const duration = clip.duration;
+      const start = clip.start;
+
+      // Remove the clip
+      delete state.clips[clipId];
+      const track = state.tracks.find(t => t.id === oldTrackId);
+      if (track) {
+        track.clips = track.clips.filter(id => id !== clipId);
+
+        // Shift subsequent clips backward
+        track.clips.forEach(id => {
+          const c = state.clips[id];
+          if (c && c.start >= start) {
+            shiftedClips.push({ id: id, oldStart: c.start });
+            c.start = Math.max(0, c.start - duration);
+          }
+        });
+      }
+    },
+    undo: (state) => {
+      if (!oldClip) return;
+
+      // Restore shifted clips
+      shiftedClips.forEach(change => {
+         const c = state.clips[change.id];
+         if (c) c.start = change.oldStart;
+      });
+      shiftedClips = [];
+
+      // Restore the deleted clip
+      state.clips[clipId] = JSON.parse(JSON.stringify(oldClip));
+      const track = state.tracks.find(t => t.id === oldTrackId);
+      if (track && !track.clips.includes(clipId)) {
+        track.clips.push(clipId);
+      }
+    }
+  };
+}
+
+// Generate an ID helper just for this file again since it's un-exported at the top,
+// Actually generateId() is available at the top scope of state.js.
+
+export function CmdPasteClips(clipsData, pasteTime) {
+  const generatedClips = []; // Array of actual inserted clips
+  let originalTrackIds = {}; // Map of clipId -> trackId
+
+  return {
+    execute: (state) => {
+      if (clipsData.length === 0) return;
+
+      // Determine the earliest start time among copied clips to maintain relative offsets
+      const minStart = Math.min(...clipsData.map(c => c.start));
+
+      clipsData.forEach(clipData => {
+         const newId = 'clip_' + Math.random().toString(36).substring(2, 9);
+         const relativeStart = clipData.start - minStart;
+         const newClip = JSON.parse(JSON.stringify(clipData));
+
+         newClip.id = newId;
+         newClip.start = pasteTime + relativeStart;
+
+         state.clips[newId] = newClip;
+         generatedClips.push(newId);
+
+         // Add to the same track it was copied from (if it exists), or the first track
+         let track = state.tracks.find(t => t.id === clipData.trackId);
+         if (!track && state.tracks.length > 0) track = state.tracks[0];
+
+         if (track) {
+            track.clips.push(newId);
+            originalTrackIds[newId] = track.id;
+         }
+      });
+    },
+    undo: (state) => {
+      generatedClips.forEach(id => {
+         delete state.clips[id];
+         const trackId = originalTrackIds[id];
+         const track = state.tracks.find(t => t.id === trackId);
+         if (track) {
+            track.clips = track.clips.filter(cId => cId !== id);
+         }
+      });
+      generatedClips.length = 0;
+      originalTrackIds = {};
+    }
+  };
+}

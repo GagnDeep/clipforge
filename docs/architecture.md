@@ -38,8 +38,8 @@ The core project state (`state.project`) follows this structure:
   clips: {
     'clip_id': {
       id: 'string',
-      assetId: 'string' | null, // null for text clips
-      kind: 'video' | 'audio' | 'image' | 'text',
+      assetId: 'string' | null, // null for text/graphic clips
+      kind: 'video' | 'audio' | 'image' | 'text' | 'graphic',
       trackId: 'string',
       start: 0, // Time in project (seconds)
       offset: 0, // Offset into the media (seconds)
@@ -54,12 +54,38 @@ The core project state (`state.project`) follows this structure:
       effects: [
         // CSS filter strings like 'brightness(1.2)'
       ],
+      animations: { // Optional, for text/graphic clips
+        in: 'fade' | 'slide' | 'pop' | 'typewriter',
+        inDuration: 0.5,
+        out: 'fade' | 'slide' | 'pop',
+        outDuration: 0.5
+      },
       text: { // Only for text clips
         content: 'string',
         font: 'string',
         size: 48,
         color: '#ffffff',
-        align: 'center'
+        align: 'center',
+        // Additive extensions
+        background: 'rgba(...)', // Background pill color
+        bgRadius: 8,
+        paddingX: 20,
+        paddingY: 10,
+        stroke: '#000000',
+        strokeWidth: 2,
+        shadow: { color: 'rgba(0,0,0,0.5)', blur: 10, offsetX: 4, offsetY: 4 },
+        maxWidth: 600
+      },
+      graphic: { // Only for graphic clips
+        type: 'rect' | 'roundrect' | 'circle' | 'svg',
+        width: 100,
+        height: 100,
+        radius: 0,
+        fill: '#ffffff',
+        stroke: '#000000',
+        strokeWidth: 2,
+        content: '<svg>...</svg>', // for svg type
+        shadow: { color: 'rgba(0,0,0,0.5)', blur: 10, offsetX: 4, offsetY: 4 }
       }
     }
   },
@@ -107,13 +133,28 @@ All cross-module communication happens through the bus.
 - **DOM**: Mounts into `#timeline-root`.
 
 ### Inspector Contract
-- **Reads**: Currently selected clip from a selection state (managed in state or a separate UI state).
-- **Listens**: `state:changed`.
-- **Dispatches**: Commands (`CmdUpdateClipTransform`, `CmdTrimClip`, etc.).
+- **Reads**: Currently selected clip from `index.html`'s selection state via `setSelectedClipId(clipId)`.
+- **Listens**: `state:changed`, `playback:timeupdate` (for keyframe interpolation).
+- **Dispatches**: Commands (`CmdUpdateClipTransform`, `CmdUpdateClipEffects`, `CmdUpdateClipSpeed`, `CmdUpdateClipAudio`, `CmdUpdateClipText`, `CmdUpdateProjectSettings`, `CmdAddKeyframe`, `CmdRemoveKeyframe`).
+- **DOM**: Mounts into `#inspector-content`. Replaces old inline stub.
 
 ### Export Contract
-The compositor will expose:
+The compositor exposes:
 ```javascript
-compositor.renderRange(t0, t1, onFrameCallback)
+compositor.renderRange(t0, t1, fps, onFrameCallback)
 ```
+- **`js/export/export-dialog.js`**: UI layer mapped to the `<dialog id="export-dialog">`. Triggers rendering via `renderer.js`.
+- **`js/export/renderer.js`**: Core export implementation. Iterates from `t0` to `t1` capturing frames manually from `compositor.canvas`.
+  - **WebM**: Uses `canvas.captureStream(0)` to feed `MediaRecorder` with deterministic frame delays and muxes audio from a realtime `MediaStreamDestination`.
+  - **MP4**: Dynamically loads `ffmpeg.wasm`, writes raw JPEGs and a mixed WAV buffer into its virtual filesystem, then executes the `libx264` codec.
+  - **PNG**: Single frame capture using `canvas.toDataURL()`.
+  - **WAV**: Mixes all audio tracks down using `OfflineAudioContext`.
+
 - The export module will iterate from `t0` to `t1` based on `project.fps`, capturing frames via `compositor.canvas` and feeding them to WebCodecs or MediaRecorder.
+
+### Timeline UI Module Contracts
+- **Timeline UI**: Implemented in \`js/panels/timeline/index.js\`.
+  - Dispatches \`CmdMoveClip\`, \`CmdTrimClip\`, \`CmdAddClip\`, \`CmdRemoveClip\`, \`CmdSplitClip\`, \`CmdDuplicateClip\` to support drag-and-drop, moving, edge-trimming, context menus, and split operations.
+  - Subscribes to \`playback:timeupdate\` to visually translate the playhead across the timeline ruler.
+  - Subscribes to \`state:changed\` for reacting to all state updates to re-render clips and track lane positions based on zoom factors (\`pixelsPerSecond\`).
+  - Stores UI state entirely local to the module class, adhering to pure architectural boundaries (no side effects crossing into compositor logic).
