@@ -126,15 +126,29 @@
   <!-- Help Dialog -->
   <dialog id="help-dialog" class="styled-dialog">
     <h2>Keyboard Shortcuts</h2>
-    <ul>
-      <li><strong>Space:</strong> Play / Pause</li>
-      <li><strong>J / K / L:</strong> Shuttle backward / Pause / Shuttle forward</li>
-      <li><strong>← / →:</strong> Frame step backward / forward</li>
-      <li><strong>Home / End:</strong> Go to start / end</li>
-      <li><strong>Ctrl/Cmd + Z:</strong> Undo</li>
-      <li><strong>Ctrl/Cmd + Shift + Z:</strong> Redo</li>
-    </ul>
-    <button id="btn-close-help">Close</button>
+    <div style="display:flex; gap: 20px;">
+        <ul>
+          <li><strong>Playback & Navigation</strong></li>
+          <li><strong>Space:</strong> Play / Pause</li>
+          <li><strong>J / K / L:</strong> Shuttle backward / Pause / Shuttle forward</li>
+          <li><strong>← / →:</strong> Frame step backward / forward</li>
+          <li><strong>Home / End:</strong> Go to start / end</li>
+          <li><strong>Shift + ? (or button):</strong> Open Help</li>
+        </ul>
+        <ul>
+          <li><strong>Timeline & Editing</strong></li>
+          <li><strong>S:</strong> Split selected clip</li>
+          <li><strong>Backspace / Delete:</strong> Remove selected clip</li>
+          <li><strong>Shift + Backspace/Del:</strong> Ripple delete</li>
+          <li><strong>Ctrl/Cmd + C:</strong> Copy selected clip</li>
+          <li><strong>Ctrl/Cmd + V:</strong> Paste clip</li>
+          <li><strong>Shift + ← / →:</strong> Nudge clip by 1 second</li>
+          <li><strong>← / →:</strong> Nudge clip 1 frame (when selected)</li>
+          <li><strong>Ctrl/Cmd + Z:</strong> Undo</li>
+          <li><strong>Ctrl/Cmd + Shift + Z / Y:</strong> Redo</li>
+        </ul>
+    </div>
+    <button id="btn-close-help" style="margin-top: 12px; width: 100%;">Close</button>
   </dialog>
 
   <!-- Export Dialog -->
@@ -500,6 +514,8 @@ const inspContent = document.getElementById('inspector-content');
             } else if (e.code === 'KeyY' && (e.ctrlKey || e.metaKey)) {
                e.preventDefault();
                store.redo();
+            } else if (e.key === '?' && e.shiftKey) {
+               document.getElementById('help-dialog').showModal();
             }
           });
         }

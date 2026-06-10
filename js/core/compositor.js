@@ -92,16 +92,42 @@ class Compositor {
       const track = tracks[i];
       if (track.kind === 'audio') continue; // Skip audio tracks in compositor
 
-      for (const clipId of track.clips) {
-        const clip = clips[clipId];
-        if (clip && time >= clip.start && time < clip.start + clip.duration) {
-          activeClips.push(clip);
+      // Sort clips on track by start time to find adjacencies easily
+      const trackClips = track.clips.map(id => clips[id]).filter(c => c).sort((a, b) => a.start - b.start);
+
+      for (let j = 0; j < trackClips.length; j++) {
+        const clip = trackClips[j];
+        const isActive = time >= clip.start && time < clip.start + clip.duration;
+
+        let inTransition = false;
+        let tProgress = 0;
+
+        if (clip.transition && j > 0) {
+            const prevClip = trackClips[j-1];
+            const isAdjacent = Math.abs((prevClip.start + prevClip.duration) - clip.start) < 0.1;
+
+            if (isAdjacent && time >= clip.start && time < clip.start + clip.transition.duration) {
+                inTransition = true;
+                tProgress = (time - clip.start) / clip.transition.duration;
+            }
+        }
+
+        if (isActive) {
+           activeClips.push({ clip, inTransition, tProgress });
+        } else if (j < trackClips.length - 1 && trackClips[j+1].transition) {
+           const nextClip = trackClips[j+1];
+           const isAdjacent = Math.abs((clip.start + clip.duration) - nextClip.start) < 0.1;
+           if (isAdjacent && time >= nextClip.start && time < nextClip.start + nextClip.transition.duration) {
+               activeClips.push({ clip, isGhost: true, nextClip });
+           }
         }
       }
     }
 
     // Draw clips
-    for (const clip of activeClips) {
+    for (const renderData of activeClips) {
+      const { clip, isGhost, inTransition, tProgress, nextClip } = renderData;
+
       this.ctx.save();
 
       // Apply transform
@@ -119,8 +145,12 @@ class Compositor {
       let offsetY = 0;
       let currentScale = 1;
 
-      const anims = clip.animations || {};
-      const clipLocalTime = time - clip.start;
+      // Calculate clipLocalTime depending on whether it's ghost or not
+      // For ghost frame, the local time should be frozen at the end of the clip duration
+      // to avoid running past the end of the video or animation.
+      let clipLocalTime = time - clip.start;
+      if (isGhost) clipLocalTime = clip.duration - 0.001; // Just before end
+
       const timeFromEnd = clip.duration - clipLocalTime;
 
       if (anims.in && clipLocalTime < anims.inDuration) {
@@ -134,6 +164,35 @@ class Compositor {
         if (anims.out === 'fade') currentOpacity *= t;
         if (anims.out === 'slide') offsetY += (1 - t) * 100;
         if (anims.out === 'pop') currentScale *= t;
+      }
+
+      // Transitions
+      if (isGhost && nextClip) {
+          const transTime = time - nextClip.start;
+          const tProgressNext = transTime / nextClip.transition.duration;
+          if (nextClip.transition.type === 'crossfade') {
+              // Ghost stays opaque, incoming clip fades in over it
+              currentOpacity *= 1;
+          } else if (nextClip.transition.type === 'dipToBlack') {
+              // First half: fade out to black. Second half: next clip fades in from black.
+              if (tProgressNext < 0.5) {
+                 const fadeOut = 1 - (tProgressNext * 2);
+                 currentOpacity *= fadeOut;
+              } else {
+                 currentOpacity = 0;
+              }
+          }
+      } else if (inTransition) {
+          if (clip.transition.type === 'crossfade') {
+              currentOpacity *= tProgress;
+          } else if (clip.transition.type === 'dipToBlack') {
+              if (tProgress > 0.5) {
+                  const fadeIn = (tProgress - 0.5) * 2;
+                  currentOpacity *= fadeIn;
+              } else {
+                  currentOpacity = 0;
+              }
+          }
       }
 
       this.ctx.translate(offsetX, offsetY);

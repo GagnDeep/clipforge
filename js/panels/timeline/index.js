@@ -204,6 +204,28 @@ export class TimelinePanel {
     this.lanesContent.addEventListener('mousedown', (e) => {
       if (e.button !== 0) return; // Only left click
 
+      const junctionEl = e.target.closest('.transition-junction');
+      if (junctionEl) {
+         e.stopPropagation();
+         this.activeJunctionClipId = junctionEl.dataset.clipId;
+         const clip = store.state.clips[this.activeJunctionClipId];
+         this.activeJunctionOldTrans = clip && clip.transition ? JSON.parse(JSON.stringify(clip.transition)) : null;
+
+         const rect = junctionEl.getBoundingClientRect();
+         this.transitionPicker.style.display = 'flex';
+         this.transitionPicker.style.left = `${rect.left}px`;
+         this.transitionPicker.style.top = `${rect.bottom + 5}px`;
+
+         if (clip && clip.transition) {
+             this.transitionPicker.querySelector('#tp-type').value = clip.transition.type;
+             this.transitionPicker.querySelector('#tp-dur').value = clip.transition.duration;
+         } else {
+             this.transitionPicker.querySelector('#tp-type').value = 'none';
+             this.transitionPicker.querySelector('#tp-dur').value = 0.5;
+         }
+         return;
+      }
+
       const handleEl = e.target.closest('.clip-handle');
       const clipEl = e.target.closest('.clip-block');
 
@@ -713,6 +735,34 @@ export class TimelinePanel {
 
       lane.appendChild(clipEl);
     });
+
+    // Add transition affordances
+    const trackClips = track.clips.map(id => clips[id]).filter(c => c).sort((a, b) => a.start - b.start);
+    for (let i = 1; i < trackClips.length; i++) {
+        const prev = trackClips[i-1];
+        const current = trackClips[i];
+        if (Math.abs((prev.start + prev.duration) - current.start) < 0.1) {
+            const junctionEl = document.createElement('div');
+            junctionEl.className = 'transition-junction';
+            junctionEl.dataset.clipId = current.id;
+
+            const junctionTime = current.start;
+            const junctionX = junctionTime * this.zoomLevel;
+
+            junctionEl.style.left = `${junctionX}px`;
+            junctionEl.title = 'Add Transition';
+
+            if (current.transition) {
+                junctionEl.classList.add('active');
+                if (current.transition.type === 'crossfade') junctionEl.innerHTML = '⧓'; // crossfade icon approximation
+                if (current.transition.type === 'dipToBlack') junctionEl.innerHTML = '◧'; // dip to black icon
+            } else {
+                junctionEl.innerHTML = '＋';
+            }
+
+            lane.appendChild(junctionEl);
+        }
+    }
   }
 
   updatePlayhead() {
