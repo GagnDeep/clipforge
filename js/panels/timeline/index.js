@@ -1,5 +1,5 @@
 import { bus } from '../../core/bus.js';
-import { store, CmdAddClip, CmdMoveClip, CmdTrimClip, CmdRemoveClip, CmdSplitClip, CmdDuplicateClip, CmdRippleDeleteClip, CmdPasteClips, CmdUpdateTrackState } from '../../core/state.js';
+import { store, CmdAddClip, CmdMoveClip, CmdTrimClip, CmdRemoveClip, CmdSplitClip, CmdDuplicateClip, CmdRippleDeleteClip, CmdPasteClips, CmdUpdateTrackState, CmdUpdateClipTransition } from '../../core/state.js';
 import { playback } from '../../core/playback.js';
 
 export class TimelinePanel {
@@ -29,6 +29,46 @@ export class TimelinePanel {
 
     this.initDOM();
     this.bindEvents();
+    this.createTransitionPicker();
+  }
+
+  createTransitionPicker() {
+      this.transitionPicker = document.createElement('div');
+      this.transitionPicker.className = 'transition-picker';
+      this.transitionPicker.innerHTML = `
+         <div style="display:flex; justify-content:space-between; align-items:center;">
+            <label>Transition</label>
+            <button id="tp-close" style="background:none; border:none; color:var(--text-muted); cursor:pointer;">&times;</button>
+         </div>
+         <select id="tp-type">
+            <option value="none">None</option>
+            <option value="crossfade">Crossfade</option>
+            <option value="dipToBlack">Dip to Black</option>
+         </select>
+         <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+            <label>Duration (s)</label>
+            <input type="number" id="tp-dur" value="0.5" step="0.1" min="0.1" style="width:60px;">
+         </div>
+         <button id="tp-apply" class="accent-btn" style="padding:4px; font-size:11px;">Apply</button>
+      `;
+      document.body.appendChild(this.transitionPicker);
+
+      this.transitionPicker.querySelector('#tp-close').addEventListener('click', () => {
+          this.transitionPicker.style.display = 'none';
+      });
+
+      this.transitionPicker.querySelector('#tp-apply').addEventListener('click', () => {
+          if (!this.activeJunctionClipId) return;
+          const type = this.transitionPicker.querySelector('#tp-type').value;
+          const duration = parseFloat(this.transitionPicker.querySelector('#tp-dur').value) || 0.5;
+
+          if (type === 'none') {
+             store.dispatch(CmdUpdateClipTransition(this.activeJunctionClipId, null));
+          } else {
+             store.dispatch(CmdUpdateClipTransition(this.activeJunctionClipId, { type, duration }));
+          }
+          this.transitionPicker.style.display = 'none';
+      });
   }
 
 

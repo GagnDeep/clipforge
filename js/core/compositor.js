@@ -145,6 +145,8 @@ class Compositor {
       let offsetY = 0;
       let currentScale = 1;
 
+      const anims = clip.animations || {};
+
       // Calculate clipLocalTime depending on whether it's ghost or not
       // For ghost frame, the local time should be frozen at the end of the clip duration
       // to avoid running past the end of the video or animation.
