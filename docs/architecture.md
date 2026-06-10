@@ -112,8 +112,13 @@ All cross-module communication happens through the bus.
 - **Dispatches**: Commands (`CmdUpdateClipTransform`, `CmdTrimClip`, etc.).
 
 ### Export Contract
-The compositor will expose:
+The compositor exposes:
 ```javascript
-compositor.renderRange(t0, t1, onFrameCallback)
+compositor.renderRange(t0, t1, fps, onFrameCallback)
 ```
-- The export module will iterate from `t0` to `t1` based on `project.fps`, capturing frames via `compositor.canvas` and feeding them to WebCodecs or MediaRecorder.
+- **`js/export/export-dialog.js`**: UI layer mapped to the `<dialog id="export-dialog">`. Triggers rendering via `renderer.js`.
+- **`js/export/renderer.js`**: Core export implementation. Iterates from `t0` to `t1` capturing frames manually from `compositor.canvas`.
+  - **WebM**: Uses `canvas.captureStream(0)` to feed `MediaRecorder` with deterministic frame delays and muxes audio from a realtime `MediaStreamDestination`.
+  - **MP4**: Dynamically loads `ffmpeg.wasm`, writes raw JPEGs and a mixed WAV buffer into its virtual filesystem, then executes the `libx264` codec.
+  - **PNG**: Single frame capture using `canvas.toDataURL()`.
+  - **WAV**: Mixes all audio tracks down using `OfflineAudioContext`.
