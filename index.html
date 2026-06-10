@@ -31,23 +31,53 @@
         <button id="btn-demo" class="accent-btn">Demo</button>
         <button id="btn-help" title="Keyboard Shortcuts">?</button>
         <button id="btn-export-proj" title="Export Project JSON">Save</button>
-        <button id="btn-export" class="accent-btn" disabled>Export Video</button>
+        <button id="btn-export" class="accent-btn">Export Video</button>
       </div>
     </header>
 
     <!-- Main Workspace -->
     <main class="workspace">
-      <!-- Media Library (Left) -->
-      <aside class="panel library-panel" id="library-root">
-        <div class="panel-header">
-          <h3>Media Library</h3>
-          <label class="btn-import">
-            Import Media
-            <input type="file" id="import-file" multiple accept="video/*,audio/*,image/*" style="display:none;">
-          </label>
+      <!-- Left Panel Container -->
+      <aside class="panel left-panel-container">
+        <!-- Tab Navigation -->
+        <div class="panel-tabs" id="left-panel-tabs">
+          <button class="tab-btn active" data-target="library-root">Media</button>
+          <button class="tab-btn" data-target="titles-root">Titles</button>
+          <button class="tab-btn" data-target="shapes-root">Shapes</button>
         </div>
-        <div class="library-grid" id="library-grid">
-          <!-- Assets will render here -->
+
+        <!-- Media Library (Left) -->
+        <div class="tab-content active" id="library-root">
+          <div class="panel-header">
+            <h3>Media Library</h3>
+            <label class="btn-import">
+              Import Media
+              <input type="file" id="import-file" multiple accept="video/*,audio/*,image/*" style="display:none;">
+            </label>
+          </div>
+          <div class="library-grid" id="library-grid">
+            <!-- Assets will be injected here -->
+          </div>
+        </div>
+
+        <!-- Titles (Left) -->
+        <div class="tab-content" id="titles-root">
+          <div class="panel-header">
+            <h3>Titles & Text</h3>
+          </div>
+          <div class="presets-grid" id="titles-grid">
+            <!-- Title presets will be injected here -->
+          </div>
+        </div>
+
+        <!-- Shapes & Graphics (Left) -->
+        <div class="tab-content" id="shapes-root">
+          <div class="panel-header">
+            <h3>Shapes & Stickers</h3>
+          </div>
+          <div class="presets-grid" id="shapes-grid">
+            <!-- Shapes will be injected here -->
+          </div>
         </div>
       </aside>
 
@@ -105,6 +135,82 @@
       <li><strong>Ctrl/Cmd + Shift + Z:</strong> Redo</li>
     </ul>
     <button id="btn-close-help">Close</button>
+  </dialog>
+
+  <!-- Export Dialog -->
+  <dialog id="export-dialog" class="styled-dialog">
+    <h2>Export Video</h2>
+    <div style="margin-bottom: 12px;">
+      <label style="display:block; margin-bottom: 4px;">Format:</label>
+      <select id="export-format" style="width: 100%;" class="styled-select">
+        <option value="webm">WebM (VP9/VP8)</option>
+        <option value="mp4">MP4 (H.264 via FFmpeg.wasm)</option>
+        <option value="png">PNG Snapshot</option>
+        <option value="wav">WAV Audio</option>
+      </select>
+      <small id="export-format-help" style="color: var(--text-muted); font-size: 11px; display: block; margin-top: 4px;">
+        WebM is always available. MP4 requires downloading FFmpeg on first use.
+      </small>
+    </div>
+
+    <div style="margin-bottom: 12px;" id="export-res-group">
+      <label style="display:block; margin-bottom: 4px;">Resolution:</label>
+      <select id="export-resolution" style="width: 100%;" class="styled-select">
+        <option value="native">Project Native</option>
+        <option value="1080">1080p</option>
+        <option value="720">720p</option>
+        <option value="480">480p</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom: 12px;" id="export-fps-group">
+      <label style="display:block; margin-bottom: 4px;">Frame Rate:</label>
+      <select id="export-fps" style="width: 100%;" class="styled-select">
+        <option value="native">Project Native</option>
+        <option value="60">60 fps</option>
+        <option value="30">30 fps</option>
+        <option value="24">24 fps</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom: 12px;" id="export-quality-group">
+      <label style="display:block; margin-bottom: 4px;">Quality:</label>
+      <select id="export-quality" style="width: 100%;" class="styled-select">
+        <option value="high">High</option>
+        <option value="medium">Medium</option>
+        <option value="low">Low</option>
+      </select>
+    </div>
+
+    <div style="margin-bottom: 24px;" id="export-range-group">
+      <label style="display:block; margin-bottom: 4px;">Range:</label>
+      <select id="export-range" style="width: 100%;" class="styled-select">
+        <option value="whole">Whole Project</option>
+        <option value="loop">Loop Region (Not implemented in UI yet)</option>
+      </select>
+    </div>
+
+    <div id="export-progress-ui" style="display: none; margin-bottom: 16px;">
+      <div style="font-size: 12px; margin-bottom: 4px;" id="export-status-text">Rendering...</div>
+      <progress id="export-progress" value="0" max="100" style="width: 100%;"></progress>
+      <div style="font-size: 11px; color: var(--text-muted); display: flex; justify-content: space-between; margin-top: 4px;">
+        <span id="export-frame-counter">Frame 0 / 0</span>
+        <span id="export-eta">ETA: --:--</span>
+      </div>
+      <button id="btn-cancel-export" style="margin-top: 12px; width: 100%;">Cancel</button>
+    </div>
+
+    <div id="export-complete-ui" style="display: none; margin-bottom: 16px; text-align: center;">
+      <div style="color: var(--accent-amber); font-weight: bold; margin-bottom: 8px;">Export Complete!</div>
+      <div id="export-file-info" style="font-size: 12px; color: var(--text-muted); margin-bottom: 12px;">Size: -- MB</div>
+      <div id="export-preview-strip" style="display: flex; gap: 4px; justify-content: center; margin-bottom: 12px;"></div>
+      <button id="btn-download-export" class="accent-btn" style="width: 100%; margin-bottom: 8px;">Download</button>
+    </div>
+
+    <div id="export-controls-ui">
+      <button id="btn-start-export" class="accent-btn" style="width: 100%; margin-bottom: 8px;">Start Export</button>
+      <button id="btn-close-export" style="width: 100%;">Close</button>
+    </div>
   </dialog>
 
   <!-- Module Entry -->
@@ -196,13 +302,16 @@
       // App Initialization and Wiring
       import { LibraryPanel } from './js/panels/library.js';
       import { InspectorPanel } from './js/panels/inspector/inspector.js';
+      import { TitlesPanel } from './js/panels/titles/index.js';
       import { compositor } from './js/core/compositor.js';
       import { mediaManager } from './js/core/media.js';
+      import { exportDialog } from './js/export/export-dialog.js';
 
       const app = {
         init() {
           this.library = new LibraryPanel();
           inspectorPanel = new InspectorPanel();
+          this.titles = new TitlesPanel();
           this.bindTopbar();
           this.bindTransport();
           this.bindShortcuts();
@@ -215,6 +324,7 @@
           document.getElementById('project-name').value = store.state.project.name;
 
           this.checkRelink();
+          exportDialog.init();
         },
 
         checkRelink() {

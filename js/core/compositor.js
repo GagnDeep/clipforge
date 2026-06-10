@@ -32,7 +32,7 @@ class Compositor {
    * Prepares or retrieves a media element for a given clip
    */
   getMediaElement(clip, time) {
-    if (clip.kind === 'text') return null;
+    if (clip.kind === 'text' || clip.kind === 'graphic') return null;
 
     let el = this.mediaElements[clip.id];
     const asset = store.state.assets[clip.assetId];
@@ -113,7 +113,32 @@ class Compositor {
       this.ctx.rotate(rotation * Math.PI / 180);
       this.ctx.scale(scale, scale);
 
-      this.ctx.globalAlpha = opacity;
+      // Entrance/Exit Animations (fade, slide, pop, typewriter handled in text)
+      let currentOpacity = opacity;
+      let offsetX = 0;
+      let offsetY = 0;
+      let currentScale = 1;
+
+      const anims = clip.animations || {};
+      const clipLocalTime = time - clip.start;
+      const timeFromEnd = clip.duration - clipLocalTime;
+
+      if (anims.in && clipLocalTime < anims.inDuration) {
+        const t = clipLocalTime / anims.inDuration;
+        if (anims.in === 'fade') currentOpacity *= t;
+        if (anims.in === 'slide') offsetY += (1 - t) * 100;
+        if (anims.in === 'pop') currentScale *= t;
+      }
+      if (anims.out && timeFromEnd < anims.outDuration) {
+        const t = timeFromEnd / anims.outDuration;
+        if (anims.out === 'fade') currentOpacity *= t;
+        if (anims.out === 'slide') offsetY += (1 - t) * 100;
+        if (anims.out === 'pop') currentScale *= t;
+      }
+
+      this.ctx.translate(offsetX, offsetY);
+      this.ctx.scale(currentScale, currentScale);
+      this.ctx.globalAlpha = Math.max(0, currentOpacity);
 
       // Apply effects (CSS filters)
       if (clip.effects && clip.effects.length > 0) {
@@ -123,10 +148,154 @@ class Compositor {
       if (clip.kind === 'text') {
         const textDef = clip.text;
         this.ctx.font = `${textDef.size}px ${textDef.font || 'sans-serif'}`;
-        this.ctx.fillStyle = textDef.color;
-        this.ctx.textAlign = textDef.align;
+        this.ctx.textAlign = textDef.align || 'center';
         this.ctx.textBaseline = 'middle';
-        this.ctx.fillText(textDef.content, 0, 0);
+
+        let content = textDef.content;
+
+        // Typewriter animation
+        if (anims.in === 'typewriter' && clipLocalTime < anims.inDuration) {
+           const chars = Math.floor((clipLocalTime / anims.inDuration) * content.length);
+           content = content.substring(0, chars);
+        }
+
+        // Max-width wrap and newline support
+        const maxWidth = textDef.maxWidth || 9999;
+        const hardLines = content.split('\n');
+        let lines = [];
+
+        for (const hLine of hardLines) {
+          const words = hLine.split(' ');
+          let currentLine = words[0] || '';
+
+          for (let i = 1; i < words.length; i++) {
+            const word = words[i];
+            const width = this.ctx.measureText(currentLine + " " + word).width;
+            if (width < maxWidth) {
+              currentLine += " " + word;
+            } else {
+              lines.push(currentLine);
+              currentLine = word;
+            }
+          }
+          lines.push(currentLine);
+        }
+
+        const lineHeight = textDef.size * 1.2;
+        const totalHeight = lines.length * lineHeight;
+        let startY = -totalHeight / 2 + lineHeight / 2;
+
+        // Padding
+        const padX = textDef.paddingX || 0;
+        const padY = textDef.paddingY || 0;
+
+        // Shadow
+        if (textDef.shadow) {
+           this.ctx.shadowColor = textDef.shadow.color || 'rgba(0,0,0,0.5)';
+           this.ctx.shadowBlur = textDef.shadow.blur || 10;
+           this.ctx.shadowOffsetX = textDef.shadow.offsetX || 0;
+           this.ctx.shadowOffsetY = textDef.shadow.offsetY || 0;
+        } else {
+           this.ctx.shadowColor = 'transparent';
+        }
+
+        // Measure max line width for background
+        let maxLineWidth = 0;
+        lines.forEach(line => {
+           maxLineWidth = Math.max(maxLineWidth, this.ctx.measureText(line).width);
+        });
+
+        // Background pill
+        if (textDef.background) {
+           this.ctx.fillStyle = textDef.background;
+           const bgWidth = maxLineWidth + padX * 2;
+           const bgHeight = totalHeight + padY * 2;
+
+           let bgX = -bgWidth / 2; // Default to center
+           if (textDef.align === 'left') {
+             bgX = -padX;
+           } else if (textDef.align === 'right') {
+             bgX = -bgWidth + padX;
+           }
+
+           const bgY = -totalHeight / 2 - padY;
+           const radius = textDef.bgRadius || 0;
+
+           this.ctx.beginPath();
+           this.ctx.roundRect(bgX, bgY, bgWidth, bgHeight, radius);
+           this.ctx.fill();
+        }
+
+        // Reset shadow for text drawing to avoid double shadow if not desired
+        if (textDef.shadow) {
+           // We keep it for text
+        }
+
+        lines.forEach((line, index) => {
+          const y = startY + (index * lineHeight);
+
+          if (textDef.stroke) {
+             this.ctx.lineWidth = textDef.strokeWidth || 2;
+             this.ctx.strokeStyle = textDef.stroke;
+             this.ctx.strokeText(line, 0, y);
+          }
+
+          this.ctx.fillStyle = textDef.color;
+          this.ctx.fillText(line, 0, y);
+        });
+
+        this.ctx.shadowColor = 'transparent'; // Reset
+
+      } else if (clip.kind === 'graphic') {
+        const gDef = clip.graphic;
+
+        if (gDef.shadow) {
+           this.ctx.shadowColor = gDef.shadow.color || 'rgba(0,0,0,0.5)';
+           this.ctx.shadowBlur = gDef.shadow.blur || 10;
+           this.ctx.shadowOffsetX = gDef.shadow.offsetX || 0;
+           this.ctx.shadowOffsetY = gDef.shadow.offsetY || 0;
+        }
+
+        if (gDef.type === 'rect' || gDef.type === 'roundrect') {
+           this.ctx.fillStyle = gDef.fill || '#fff';
+           this.ctx.beginPath();
+           const w = gDef.width || 100;
+           const h = gDef.height || 100;
+           const r = gDef.radius || 0;
+           this.ctx.roundRect(-w/2, -h/2, w, h, r);
+           this.ctx.fill();
+           if (gDef.stroke) {
+             this.ctx.lineWidth = gDef.strokeWidth || 2;
+             this.ctx.strokeStyle = gDef.stroke;
+             this.ctx.stroke();
+           }
+        } else if (gDef.type === 'circle') {
+           this.ctx.fillStyle = gDef.fill || '#fff';
+           this.ctx.beginPath();
+           this.ctx.arc(0, 0, gDef.radius || 50, 0, Math.PI * 2);
+           this.ctx.fill();
+           if (gDef.stroke) {
+             this.ctx.lineWidth = gDef.strokeWidth || 2;
+             this.ctx.strokeStyle = gDef.stroke;
+             this.ctx.stroke();
+           }
+        } else if (gDef.type === 'svg' && gDef.content) {
+           // Create image from SVG string
+           if (!this.mediaElements[clip.id]) {
+             const img = new Image();
+             img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(gDef.content);
+             this.mediaElements[clip.id] = img;
+           }
+           const img = this.mediaElements[clip.id];
+           if (img && img.complete) {
+             const w = gDef.width || img.width || 100;
+             const h = gDef.height || img.height || 100;
+             this.ctx.drawImage(img, -w/2, -h/2, w, h);
+           }
+        }
+
+        this.ctx.shadowColor = 'transparent'; // Reset
+
       } else {
         const el = this.getMediaElement(clip, time);
         if (el) {
